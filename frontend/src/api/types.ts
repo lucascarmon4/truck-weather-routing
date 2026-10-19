@@ -55,6 +55,15 @@ export type RouteGeometry = {
   elapsed_s: number[]
 }
 
+export type RestStop = {
+  kind: 'break' | 'rest'
+  mile: number
+  lat: number
+  lon: number
+  start_s: number
+  end_s: number
+}
+
 export type Route = {
   id: string
   name: string
@@ -68,6 +77,7 @@ export type Route = {
   avg_risk: number
   max_level: Level
   geometry: RouteGeometry
+  stops: RestStop[]
   checkpoints: Checkpoint[]
 }
 

@@ -32,11 +32,30 @@ export function sliceByMiles(geometry: RouteGeometry, from: number, to: number):
   return [pointAlong(coordinates, miles, from), ...inner, pointAlong(coordinates, miles, to)]
 }
 
-export function truckPosition(route: Route, secondsAfterDeparture: number) {
-  const { coordinates, elapsed_s } = route.geometry
-  const status =
-    secondsAfterDeparture < 0 ? 'waiting' : secondsAfterDeparture >= route.trip_s ? 'arrived' : 'driving'
-  return { position: pointAlong(coordinates, elapsed_s, secondsAfterDeparture), status } as const
+export type TruckStatus = 'waiting' | 'driving' | 'break' | 'rest' | 'arrived'
+
+export type TruckState = { position: LonLat; mile: number; status: TruckStatus; until?: number }
+
+export function truckPosition(route: Route, secondsAfterDeparture: number): TruckState {
+  const { coordinates, elapsed_s, miles } = route.geometry
+  const t = secondsAfterDeparture
+  const stop = route.stops.find((s) => t >= s.start_s && t < s.end_s)
+  if (stop) return { position: [stop.lon, stop.lat], mile: stop.mile, status: stop.kind, until: stop.end_s }
+  const status: TruckStatus = t < 0 ? 'waiting' : t >= route.trip_s ? 'arrived' : 'driving'
+  return { position: pointAlong(coordinates, elapsed_s, t), mile: valueAlong(miles, elapsed_s, t), status }
+}
+
+export function valueAlong(values: number[], measures: number[], x: number) {
+  if (x <= measures[0]) return values[0]
+  const last = measures.length - 1
+  if (x >= measures[last]) return values[last]
+  const i = upperIndex(measures, x)
+  const span = measures[i] - measures[i - 1]
+  return values[i - 1] + (span === 0 ? 0 : (x - measures[i - 1]) / span) * (values[i] - values[i - 1])
+}
+
+export function worstCheckpoint(route: Route) {
+  return route.checkpoints.reduce((worst, cp) => (cp.score > worst.score ? cp : worst), route.checkpoints[0])
 }
 
 export function checkpointWindows(route: Route) {

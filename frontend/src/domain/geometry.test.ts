@@ -19,6 +19,7 @@ const route: Route = {
     miles: [0, 50, 100],
     elapsed_s: [0, 3600, 7200],
   },
+  stops: [],
   checkpoints: [checkpoint(0, 0), checkpoint(25, 0), checkpoint(50, 3), checkpoint(75, 0), checkpoint(100, 0)],
 }
 
@@ -38,9 +39,14 @@ describe('sliceByMiles', () => {
 
 describe('truckPosition', () => {
   it('follows elapsed time and reports status', () => {
-    expect(truckPosition(route, 1800)).toEqual({ position: [25, 0], status: 'driving' })
+    expect(truckPosition(route, 1800)).toEqual({ position: [25, 0], mile: 25, status: 'driving' })
     expect(truckPosition(route, -60).status).toBe('waiting')
-    expect(truckPosition(route, 9000)).toEqual({ position: [100, 0], status: 'arrived' })
+    expect(truckPosition(route, 9000)).toEqual({ position: [100, 0], mile: 100, status: 'arrived' })
+  })
+
+  it('parks the truck during a rest stop', () => {
+    const resting = { ...route, stops: [{ kind: 'rest' as const, mile: 60, lat: 0, lon: 60, start_s: 4000, end_s: 40000 }] }
+    expect(truckPosition(resting, 5000)).toEqual({ position: [60, 0], mile: 60, status: 'rest', until: 40000 })
   })
 })
 
