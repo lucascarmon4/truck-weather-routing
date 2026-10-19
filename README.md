@@ -59,7 +59,9 @@ The explanation names the first criterion that separates the winner from each ot
   hour *ending* at each timestamp, so the hour that contains the ETA is used.
 - Optional **hours-of-service rest breaks** (off by default): a 30 min break after 8 h of driving and a 10 h
   reset after 11 h. When enabled, ETAs and the trip time include them, so later checkpoints read the forecast
-  for when the truck really gets there.
+  for when the truck really gets there. The API returns each stop (kind, mile, start and end), and the map parks
+  the truck there while the timeline shows the stop as its own band.
+- Times are shown in the viewer's browser time zone, labelled with its abbreviation.
 
 ## Heatmap
 
@@ -67,9 +69,9 @@ The backend builds a regular lat/lon grid that covers the corridor around all th
 up to ~260 points) and returns 49 hourly values per point for risk, wind and precipitation.
 
 The frontend turns each hour into a small image: values are interpolated bilinearly, the rows are resampled
-to Web Mercator so they line up with the basemap, and the image is drawn as a MapLibre raster layer. All 49
-frames are pre-rendered during idle time after a plan loads, so moving the slider or pressing play only swaps an
-image: nothing is fetched and no GeoJSON is rebuilt.
+to Web Mercator so they line up with the basemap, and the pixels are handed to a MapLibre image source as
+`ImageData`. All 49 frames are pre-rendered during idle time after a plan loads, so moving the slider or pressing
+play only swaps pixels: nothing is fetched, decoded or rebuilt.
 
 ## Providers
 
@@ -105,8 +107,9 @@ backend/                Django + DRF
     hos.py              rest breaks
     planner.py          orchestration and response
 frontend/               React + TypeScript + MUI + MapLibre (react-map-gl)
-  src/domain/           geometry, heatmap rendering, formatting
-  src/map/              map component and layer styles
+  src/components/       trip form, route cards, timeline, checkpoint table, heatmap controls
+  src/domain/           geometry, heatmap rendering, formatting, trip model
+  src/map/              map component, layer styles and markers
 docs/api.md             API contract and response types
 ```
 
