@@ -11,11 +11,27 @@ export const LEVEL_LABEL: Record<Level, string> = {
 }
 
 export const LEVEL_COLOR: Record<Level, string> = {
-  0: '#2e9d5b',
-  1: '#e3b505',
-  2: '#f07c1b',
-  3: '#d7263d',
-  4: '#4a1c6b',
+  0: '#2E9E5B',
+  1: '#E8B400',
+  2: '#EC7A1C',
+  3: '#D0302C',
+  4: '#3E1A5C',
+}
+
+export const LEVEL_TINT: Record<Level, string> = {
+  0: '#E4F4EA',
+  1: '#FCF3D2',
+  2: '#FDEAD9',
+  3: '#FAE1E0',
+  4: '#ECE4F2',
+}
+
+export const LEVEL_INK: Record<Level, string> = {
+  0: '#1B6A3B',
+  1: '#735600',
+  2: '#97470A',
+  3: '#A1201C',
+  4: '#3E1A5C',
 }
 
 export const LEVEL_KEY: Record<Level, keyof MilesByLevel> = {
