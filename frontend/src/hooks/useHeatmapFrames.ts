@@ -22,5 +22,5 @@ export function useHeatmapFrames(heatmap: Heatmap | undefined, layer: HeatmapLay
     return () => window.clearTimeout(handle)
   }, [render, heatmap])
 
-  return { coordinates: grid?.coordinates ?? null, frameUrl: render }
+  return { coordinates: grid?.coordinates ?? null, frame: render }
 }

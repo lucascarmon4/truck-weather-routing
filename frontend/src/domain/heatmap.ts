@@ -11,42 +11,51 @@ function hex(color: string, alpha: number): Rgba {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255, alpha]
 }
 
-export const HEATMAP_SCALES: Record<HeatmapLayer, { label: string; unit: string; stops: ColorStop[] }> = {
+type Scale = { label: string; unit: string; ticks: string[]; stops: ColorStop[] }
+
+export const HEATMAP_SCALES: Record<HeatmapLayer, Scale> = {
   risk: {
     label: 'Risk',
-    unit: 'level',
+    unit: 'level 0–4',
+    ticks: ['Low', 'Mod', 'High', 'Sev', 'No Trv'],
     stops: [
-      [0, hex(LEVEL_COLOR[0], 0.1)],
-      [1, hex(LEVEL_COLOR[1], 0.45)],
-      [2, hex(LEVEL_COLOR[2], 0.6)],
-      [3, hex(LEVEL_COLOR[3], 0.7)],
-      [4, hex(LEVEL_COLOR[4], 0.8)],
+      [0, hex(LEVEL_COLOR[0], 0.24)],
+      [1, hex(LEVEL_COLOR[1], 0.46)],
+      [2, hex(LEVEL_COLOR[2], 0.64)],
+      [3, hex(LEVEL_COLOR[3], 0.8)],
+      [4, hex(LEVEL_COLOR[4], 0.86)],
     ],
   },
   wind: {
     label: 'Wind',
     unit: 'mph',
+    ticks: ['0', '15', '30', '45', '60+'],
     stops: [
-      [0, [120, 170, 220, 0.05]],
-      [15, [120, 170, 220, 0.35]],
-      [25, hex(LEVEL_COLOR[1], 0.55)],
-      [35, hex(LEVEL_COLOR[2], 0.65)],
-      [45, hex(LEVEL_COLOR[3], 0.75)],
-      [55, hex(LEVEL_COLOR[4], 0.85)],
+      [0, hex('#B5CCE6', 0.2)],
+      [15, hex('#8DB0DA', 0.42)],
+      [30, hex('#6E9BCB', 0.6)],
+      [45, hex('#3462A4', 0.76)],
+      [60, hex('#14306B', 0.88)],
     ],
   },
   precip: {
     label: 'Precipitation',
     unit: 'in/hr',
+    ticks: ['0', '0.1', '0.25', '0.5', '1+'],
     stops: [
-      [0, [90, 160, 230, 0]],
-      [0.01, [90, 160, 230, 0.25]],
-      [0.1, [40, 110, 220, 0.5]],
-      [0.25, [30, 60, 190, 0.65]],
-      [0.5, [100, 40, 170, 0.75]],
-      [1, [70, 20, 110, 0.85]],
+      [0, hex('#9ED8C6', 0)],
+      [0.01, hex('#9ED8C6', 0.32)],
+      [0.1, hex('#6CC3B0', 0.48)],
+      [0.25, hex('#46AFA0', 0.62)],
+      [0.5, hex('#1B7C86', 0.76)],
+      [1, hex('#0D4560', 0.88)],
     ],
   },
+}
+
+export function scaleGradient(layer: HeatmapLayer) {
+  const colors = HEATMAP_SCALES[layer].stops.map(([, [r, g, b]]) => `rgb(${r},${g},${b})`)
+  return `linear-gradient(90deg, ${colors.join(', ')})`
 }
 
 export function colorAt(stops: ColorStop[], value: number): Rgba {
@@ -152,16 +161,12 @@ export function buildGrid(heatmap: Heatmap): HeatmapGrid {
 export function createFrameRenderer(heatmap: Heatmap, grid: HeatmapGrid, layer: HeatmapLayer) {
   const values = heatmap[layer]
   const { stops } = HEATMAP_SCALES[layer]
-  const canvas = document.createElement('canvas')
-  canvas.width = grid.width
-  canvas.height = grid.height
-  const context = canvas.getContext('2d')!
-  const cache = new Map<number, string>()
+  const cache = new Map<number, ImageData>()
 
   return (hour: number) => {
     const hit = cache.get(hour)
     if (hit) return hit
-    const image = context.createImageData(grid.width, grid.height)
+    const image = new ImageData(grid.width, grid.height)
     const pixels = grid.width * grid.height
     for (let p = 0; p < pixels; p++) {
       let coverage = 0
@@ -180,9 +185,7 @@ export function createFrameRenderer(heatmap: Heatmap, grid: HeatmapGrid, layer: 
       image.data[offset + 2] = b
       image.data[offset + 3] = Math.round(a * Math.min(1, coverage * 1.5) * 255)
     }
-    context.putImageData(image, 0, 0)
-    const url = canvas.toDataURL('image/png')
-    cache.set(hour, url)
-    return url
+    cache.set(hour, image)
+    return image
   }
 }
