@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from django.core.cache import cache
 
 from routing.services.errors import UpstreamError
 from routing.services.metno import parse_timeseries
@@ -50,8 +51,6 @@ class Working:
 @pytest.fixture(autouse=True)
 def local_cache(settings):
     settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "metno"}}
-    from django.core.cache import cache
-
     cache.clear()
 
 
