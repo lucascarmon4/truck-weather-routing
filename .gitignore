@@ -1,0 +1,12 @@
+*.pdf
+.env
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+backend/staticfiles/*
+!backend/staticfiles/.gitkeep
+node_modules/
+frontend/dist/
+.DS_Store
+prompt-*.md
