@@ -75,7 +75,7 @@ export function RouteBadge({ letter, selected, onClick }: { letter: string; sele
 
 export function RestMarker({ label }: { label: string }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pointerEvents: 'none', transform: 'translate(9px, 14px)' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pointerEvents: 'none', transform: 'translateY(10px)' }}>
       <Box
         sx={{
           width: 18,

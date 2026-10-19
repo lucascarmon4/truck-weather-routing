@@ -158,7 +158,7 @@ export function RouteMap({
         {selected?.stops
           .filter((stop) => stop.kind === 'rest')
           .map((stop) => (
-            <Marker key={`${stop.start_s}`} longitude={stop.lon} latitude={stop.lat} anchor="top-left">
+            <Marker key={`${stop.start_s}`} longitude={stop.lon} latitude={stop.lat} anchor="top">
               <RestMarker label="10 h rest" />
             </Marker>
           ))}

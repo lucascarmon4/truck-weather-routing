@@ -333,14 +333,16 @@ export default function App() {
             <Box sx={{ flex: 'none', display: 'flex', justifyContent: 'center', pt: 1 }}>
               <Box sx={{ width: 32, height: 4, borderRadius: '2px', bgcolor: '#C4C9D0' }} />
             </Box>
-            <Box sx={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '4px 8px 0 16px', minHeight: 44 }}>
-              <Box component="h2" sx={{ m: 0, fontSize: 16, fontWeight: 600 }}>{showForm ? 'Plan a trip' : 'Routes'}</Box>
-              {showForm && plan && (
-                <ButtonBase aria-label="Close" onClick={() => setFormOpen(false)} sx={{ width: 44, height: 44, borderRadius: '50%', color: ui.textBody }}>
-                  <CloseIcon size={20} />
-                </ButtonBase>
-              )}
-            </Box>
+            {showForm && (
+              <Box sx={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '4px 8px 0 16px', minHeight: 44 }}>
+                <Box component="h2" sx={{ m: 0, fontSize: 16, fontWeight: 600 }}>Plan a trip</Box>
+                {plan && (
+                  <ButtonBase aria-label="Close" onClick={() => setFormOpen(false)} sx={{ width: 44, height: 44, borderRadius: '50%', color: ui.textBody }}>
+                    <CloseIcon size={20} />
+                  </ButtonBase>
+                )}
+              </Box>
+            )}
           </>
         )}
         {panelBody}

@@ -19,7 +19,7 @@ export const HEATMAP_SCALES: Record<HeatmapLayer, Scale> = {
     unit: 'level 0–4',
     ticks: ['Low', 'Mod', 'High', 'Sev', 'No Trv'],
     stops: [
-      [0, hex(LEVEL_COLOR[0], 0.24)],
+      [0, hex(LEVEL_COLOR[0], 0.18)],
       [1, hex(LEVEL_COLOR[1], 0.46)],
       [2, hex(LEVEL_COLOR[2], 0.64)],
       [3, hex(LEVEL_COLOR[3], 0.8)],
@@ -72,6 +72,7 @@ export function colorAt(stops: ColorStop[], value: number): Rgba {
 }
 
 const MAX_IMAGE_WIDTH = 480
+const EDGE_FADE_CELLS = 1.5
 
 function mercatorY(lat: number) {
   const rad = (lat * Math.PI) / 180
@@ -90,6 +91,7 @@ export type HeatmapGrid = {
   height: number
   taps: Int32Array
   weights: Float32Array
+  edge: Float32Array
   coordinates: [[number, number], [number, number], [number, number], [number, number]]
 }
 
@@ -116,6 +118,16 @@ export function buildGrid(heatmap: Heatmap): HeatmapGrid {
   const height = rows * scale
   const yNorth = mercatorY(north)
   const ySouth = mercatorY(south)
+
+  const edge = new Float32Array(width * height)
+  const fade = scale * EDGE_FADE_CELLS
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
+      const d = Math.min(px + 0.5, width - px - 0.5, py + 0.5, height - py - 0.5) / fade
+      const t = Math.min(1, d)
+      edge[py * width + px] = t * t * (3 - 2 * t)
+    }
+  }
 
   const taps = new Int32Array(width * height * 4).fill(-1)
   const weights = new Float32Array(width * height * 4)
@@ -149,6 +161,7 @@ export function buildGrid(heatmap: Heatmap): HeatmapGrid {
     height,
     taps,
     weights,
+    edge,
     coordinates: [
       [west, north],
       [east, north],
@@ -169,6 +182,8 @@ export function createFrameRenderer(heatmap: Heatmap, grid: HeatmapGrid, layer: 
     const image = new ImageData(grid.width, grid.height)
     const pixels = grid.width * grid.height
     for (let p = 0; p < pixels; p++) {
+      const edge = grid.edge[p]
+      if (edge === 0) continue
       let coverage = 0
       let sum = 0
       for (let k = p * 4; k < p * 4 + 4; k++) {
@@ -183,7 +198,7 @@ export function createFrameRenderer(heatmap: Heatmap, grid: HeatmapGrid, layer: 
       image.data[offset] = r
       image.data[offset + 1] = g
       image.data[offset + 2] = b
-      image.data[offset + 3] = Math.round(a * Math.min(1, coverage * 1.5) * 255)
+      image.data[offset + 3] = Math.round(a * Math.min(1, coverage * 1.5) * edge * 255)
     }
     cache.set(hour, image)
     return image
