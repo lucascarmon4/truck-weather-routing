@@ -12,7 +12,7 @@ export function usePlan() {
   const [state, setState] = useState<PlanState>({ status: 'idle' })
   const controller = useRef<AbortController | null>(null)
 
-  const run = useCallback(async (request: PlanRequest) => {
+  const run = useCallback(async (request: PlanRequest): Promise<PlanResponse | null> => {
     controller.current?.abort()
     const current = new AbortController()
     controller.current = current
@@ -20,10 +20,12 @@ export function usePlan() {
     try {
       const data = await planTrip(request, current.signal)
       setState({ status: 'success', request, data })
+      return data
     } catch (error) {
-      if (current.signal.aborted) return
+      if (current.signal.aborted) return null
       const message = error instanceof ApiError ? error.message : 'Unexpected error. Please try again.'
       setState({ status: 'error', request, message })
+      return null
     }
   }, [])
 
