@@ -252,14 +252,14 @@ function HeatmapImage({ frame, coordinates, opacity }: { frame: ImageData; coord
       const source = map.getSource<ImageSource>('heatmap')
       if (!source) return
       map.off('sourcedata', apply)
-      source.updateImage({ image: frame })
+      source.updateImage({ image: frame, coordinates })
     }
     map.on('sourcedata', apply)
     apply()
     return () => {
       map.off('sourcedata', apply)
     }
-  }, [ref, frame])
+  }, [ref, frame, coordinates])
 
   return (
     <Source id="heatmap" type="image" coordinates={coordinates}>
