@@ -47,10 +47,32 @@ class Working:
         return {p: series() for p in points}
 
 
+@pytest.fixture(autouse=True)
+def local_cache(settings):
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "metno"}}
+    from django.core.cache import cache
+
+    cache.clear()
+
+
 def test_fallback_uses_the_next_source_and_records_it():
     client = FallbackWeatherClient(Failing(), Working())
     assert client.hourly([(1.0, 2.0)], START, START)
     assert client.source == "up"
+
+
+def test_a_failed_source_is_skipped_for_a_while():
+    calls = []
+
+    class Counting(Failing):
+        def hourly(self, points, start, end):
+            calls.append(1)
+            return super().hourly(points, start, end)
+
+    client = FallbackWeatherClient(Counting(), Working())
+    client.hourly([(1.0, 2.0)], START, START)
+    client.hourly([(1.0, 2.0)], START, START)
+    assert len(calls) == 1
 
 
 def test_fallback_raises_when_every_source_fails():

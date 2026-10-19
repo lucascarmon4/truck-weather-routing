@@ -51,11 +51,10 @@ def test_client_retries_transient_failures(settings, monkeypatch):
         "showers": [0], "snowfall": [0], "temperature_2m": [30], "weather_code": [0],
     }
     url = "https://api.open-meteo.com/v1/forecast"
-    responses.get(url, body="")
     responses.get(url, status=503)
     responses.get(url, json={"hourly": hourly})
     result = OpenMeteoClient().hourly([(40.0, -100.0)], START, START)
-    assert len(responses.calls) == 3
+    assert len(responses.calls) == 2
     assert result[(40.0, -100.0)].wind == [10]
 
 
@@ -66,3 +65,4 @@ def test_client_gives_up_with_a_clear_message(settings, monkeypatch):
     responses.get("https://api.open-meteo.com/v1/forecast", status=429)
     with pytest.raises(UpstreamError, match="rate limit"):
         OpenMeteoClient().hourly([(40.0, -100.0)], START, START)
+    assert len(responses.calls) == 1

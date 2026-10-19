@@ -24,8 +24,10 @@ HOURLY_VARIABLES = (
 SNAP_DEG = 0.05
 CACHE_TTL_SECONDS = 30 * 60
 MAX_FORECAST_DAYS = 16
-RETRIES = 2
-RETRY_BACKOFF_SECONDS = 1.5
+RETRIES = 1
+RETRY_BACKOFF_SECONDS = 1.0
+REQUEST_TIMEOUT_SECONDS = 8
+SOURCE_COOLDOWN_SECONDS = 5 * 60
 
 
 def snap(lat, lon):
@@ -164,12 +166,14 @@ class FallbackWeatherClient:
         self.source = None
 
     def hourly(self, points, start, end):
-        error = None
-        for client in self.clients:
+        error = UpstreamError("Weather services are unavailable right now. Please try again shortly.")
+        available = [c for c in self.clients if not cache.get(f"weather-down:{c.name}")] or list(self.clients)
+        for client in available:
             try:
                 result = client.hourly(points, start, end)
             except UpstreamError as exc:
                 logger.warning("%s failed, trying the next weather source: %s", client.name, exc.message)
+                cache.set(f"weather-down:{client.name}", True, SOURCE_COOLDOWN_SECONDS)
                 error = exc
                 continue
             self.source = client.name
@@ -209,14 +213,13 @@ class OpenMeteoClient(CachedWeatherClient):
             if attempt:
                 time.sleep(RETRY_BACKOFF_SECONDS * attempt)
             try:
-                response = self.session.get(self.base_url, params=params, timeout=settings.HTTP_TIMEOUT_SECONDS)
+                response = self.session.get(self.base_url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
             except requests.RequestException as exc:
                 logger.warning("Open-Meteo unreachable (attempt %s): %s", attempt + 1, exc)
                 error = UpstreamError("Weather service is unreachable.")
                 continue
             if response.status_code == 429:
-                error = UpstreamError("Weather service rate limit reached. Please try again in a minute.")
-                continue
+                raise UpstreamError("Weather service rate limit reached. Please try again in a minute.")
             if response.status_code >= 500:
                 logger.warning("Open-Meteo %s (attempt %s)", response.status_code, attempt + 1)
                 continue
