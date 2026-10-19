@@ -147,8 +147,10 @@ the cache between instances.
 
 ## Trade-offs and next steps
 
-- The free Open-Meteo tier allows about 10,000 location-calls per day; a long trip uses ~300. The MET Norway
-  fallback and the caches keep the demo usable; a paid key (`OPEN_METEO_API_KEY`) removes the limit.
+- The free Open-Meteo tier allows about 10,000 location-calls per day and 600 per minute, counted per IP; a long trip
+  uses ~300. On shared hosting IPs (like Render's free tier) the limit is often already spent, so the live demo
+  usually runs on the MET Norway fallback, which has no gust data and is slower on a cold cache. A paid key
+  (`OPEN_METEO_API_KEY`) removes the limit.
 - The heatmap shows forecast conditions over the corridor at each hour. Checkpoint risk uses the hour the truck
   reaches each point. They answer different questions, which is why both are shown.
 - Next: suggest the safest departure time in the next 48 h, and push alerts when the forecast for a planned trip
