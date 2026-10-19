@@ -1,4 +1,5 @@
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,8 @@ BATCH_SIZE = 80
 MAX_WORKERS = 4
 CACHE_TTL_SECONDS = 30 * 60
 MAX_FORECAST_DAYS = 16
+RETRIES = 2
+RETRY_BACKOFF_SECONDS = 1.5
 
 
 def snap(lat, lon):
@@ -145,18 +148,33 @@ class OpenMeteoClient:
         }
         if self.api_key:
             params["apikey"] = self.api_key
-        try:
-            response = self.session.get(self.base_url, params=params, timeout=settings.HTTP_TIMEOUT_SECONDS)
-        except requests.RequestException as exc:
-            raise UpstreamError("Weather service is unreachable.") from exc
-        if response.status_code == 429:
-            raise UpstreamError("Weather service rate limit reached. Please try again in a minute.")
-        if not response.ok:
-            logger.warning("Open-Meteo %s: %s", response.status_code, response.text[:300])
-            raise UpstreamError("Weather service returned an error.")
-        payload = response.json()
-        locations = payload if isinstance(payload, list) else [payload]
-        return {point: _parse_location(loc) for point, loc in zip(points, locations)}
+        error = UpstreamError("Weather service returned an error.")
+        for attempt in range(RETRIES + 1):
+            if attempt:
+                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+            try:
+                response = self.session.get(self.base_url, params=params, timeout=settings.HTTP_TIMEOUT_SECONDS)
+            except requests.RequestException as exc:
+                logger.warning("Open-Meteo unreachable (attempt %s): %s", attempt + 1, exc)
+                error = UpstreamError("Weather service is unreachable.")
+                continue
+            if response.status_code == 429:
+                error = UpstreamError("Weather service rate limit reached. Please try again in a minute.")
+                continue
+            if response.status_code >= 500:
+                logger.warning("Open-Meteo %s (attempt %s)", response.status_code, attempt + 1)
+                continue
+            if not response.ok:
+                logger.warning("Open-Meteo %s: %s", response.status_code, response.text[:300])
+                raise error
+            try:
+                payload = response.json()
+            except ValueError:
+                logger.warning("Open-Meteo sent a non-JSON body (attempt %s): %r", attempt + 1, response.text[:200])
+                continue
+            locations = payload if isinstance(payload, list) else [payload]
+            return {point: _parse_location(loc) for point, loc in zip(points, locations)}
+        raise error
 
     def hourly(self, points, start, end):
         start, end = floor_hour(start), ceil_hour(end)

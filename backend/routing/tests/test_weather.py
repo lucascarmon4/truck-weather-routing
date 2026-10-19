@@ -3,6 +3,7 @@ from datetime import timedelta
 import pytest
 import responses
 
+from routing.services.errors import UpstreamError
 from routing.services.weather import OpenMeteoClient, snap
 
 from .factories import START, series
@@ -39,3 +40,29 @@ def test_client_batches_locations_and_caches(settings):
     client.hourly(points, START, START + timedelta(hours=1))
     assert len(responses.calls) == 1
     assert result[(40.0, -100.0)].rain == pytest.approx([0.15, 0.0])
+
+
+@responses.activate
+def test_client_retries_transient_failures(settings, monkeypatch):
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}
+    monkeypatch.setattr("routing.services.weather.time.sleep", lambda _: None)
+    hourly = {
+        "time": ["2030-01-15T11:00"], "wind_speed_10m": [10], "wind_gusts_10m": [15], "rain": [0],
+        "showers": [0], "snowfall": [0], "temperature_2m": [30], "weather_code": [0],
+    }
+    url = "https://api.open-meteo.com/v1/forecast"
+    responses.get(url, body="")
+    responses.get(url, status=503)
+    responses.get(url, json={"hourly": hourly})
+    result = OpenMeteoClient().hourly([(40.0, -100.0)], START, START)
+    assert len(responses.calls) == 3
+    assert result[(40.0, -100.0)].wind == [10]
+
+
+@responses.activate
+def test_client_gives_up_with_a_clear_message(settings, monkeypatch):
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}
+    monkeypatch.setattr("routing.services.weather.time.sleep", lambda _: None)
+    responses.get("https://api.open-meteo.com/v1/forecast", status=429)
+    with pytest.raises(UpstreamError, match="rate limit"):
+        OpenMeteoClient().hourly([(40.0, -100.0)], START, START)
