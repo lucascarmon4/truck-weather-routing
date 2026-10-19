@@ -15,7 +15,8 @@ from .heatmap import HEATMAP_HOURS, build_heatmap, corridor_grid
 from .hos import elapsed_time
 from .providers import RouteQuery, get_provider
 from .recommend import recommend
-from .weather import OpenMeteoClient, floor_hour, forecast_horizon
+from .metno import MetNorwayClient
+from .weather import FallbackWeatherClient, OpenMeteoClient, floor_hour, forecast_horizon
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +57,16 @@ class PlanRequest:
         return "plan:" + hashlib.sha1(raw.encode()).hexdigest()
 
 
+def default_weather_client():
+    return FallbackWeatherClient(OpenMeteoClient(), MetNorwayClient())
+
+
 def plan(request: PlanRequest, provider=None, weather_client=None):
     provider = provider or get_provider()
     key = request.cache_key(provider.name)
     if (cached := cache.get(key)) is not None:
         return cached
-    result = Planner(request, provider, weather_client or OpenMeteoClient()).run()
+    result = Planner(request, provider, weather_client or default_weather_client()).run()
     cache.set(key, result, PLAN_CACHE_TTL_SECONDS)
     return result
 
@@ -110,6 +115,7 @@ class Planner:
                 "hos": req.hos,
             },
             "provider": self.provider.name,
+            "weather_provider": getattr(self.weather, "source", None) or getattr(self.weather, "name", None),
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "routes": [
                 self._serialize_route(a, label, recommendation["ranking"].index(label) + 1)

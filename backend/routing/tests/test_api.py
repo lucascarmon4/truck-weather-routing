@@ -19,7 +19,7 @@ def client(monkeypatch, settings):
         straight_route(start=(41.0, -100.0), speed_mps=25, name="calm"),
     ]
     monkeypatch.setattr(planner, "get_provider", lambda: FakeProvider(routes))
-    monkeypatch.setattr(planner, "OpenMeteoClient", lambda: FakeWeather(lambda p: windy if p[0] < 40.5 else calm))
+    monkeypatch.setattr(planner, "default_weather_client", lambda: FakeWeather(lambda p: windy if p[0] < 40.5 else calm))
     return APIClient()
 
 

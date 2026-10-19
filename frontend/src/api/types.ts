@@ -17,7 +17,7 @@ export type PlanRequest = {
 
 export type Weather = {
   wind_mph: number
-  gust_mph: number
+  gust_mph: number | null
   rain_in_hr: number
   snow_in_hr: number
   temperature_f: number | null
@@ -106,6 +106,7 @@ export type Rules = {
 export type PlanResponse = {
   request: Omit<PlanRequest, 'origin' | 'destination'> & { origin: Place; destination: Place }
   provider: string
+  weather_provider: string
   generated_at: string
   routes: Route[]
   recommendation: Recommendation

@@ -35,7 +35,7 @@ type Checkpoint = {
   covered_mi: number;                                            // route miles this checkpoint represents
   weather: {
     wind_mph: number;
-    gust_mph: number;
+    gust_mph: number | null;                                     // null when the fallback source has no gusts
     rain_in_hr: number;
     snow_in_hr: number;
     temperature_f: number | null;
@@ -70,6 +70,7 @@ type Route = {
 type PlanResponse = {
   request: PlanRequest & { origin: { label: string; lat: number; lon: number }; destination: { label: string; lat: number; lon: number } };
   provider: "tomtom" | "osrm";
+  weather_provider: "open-meteo" | "met-norway";
   generated_at: string;
   routes: Route[];
   recommendation: {

@@ -22,8 +22,6 @@ HOURLY_VARIABLES = (
     "weather_code",
 )
 SNAP_DEG = 0.05
-BATCH_SIZE = 80
-MAX_WORKERS = 4
 CACHE_TTL_SECONDS = 30 * 60
 MAX_FORECAST_DAYS = 16
 RETRIES = 2
@@ -46,7 +44,7 @@ def ceil_hour(dt):
 @dataclass
 class WeatherSample:
     wind_mph: float
-    gust_mph: float
+    gust_mph: float | None
     rain_in_hr: float
     snow_in_hr: float
     temperature_f: float | None
@@ -55,7 +53,7 @@ class WeatherSample:
     def as_dict(self):
         return {
             "wind_mph": round(self.wind_mph, 1),
-            "gust_mph": round(self.gust_mph, 1),
+            "gust_mph": None if self.gust_mph is None else round(self.gust_mph, 1),
             "rain_in_hr": round(self.rain_in_hr, 3),
             "snow_in_hr": round(self.snow_in_hr, 2),
             "temperature_f": None if self.temperature_f is None else round(self.temperature_f),
@@ -98,7 +96,7 @@ class HourlySeries:
         bucket = self.at_hour(ceil_hour(moment))
         return WeatherSample(
             wind_mph=a.wind_mph + t * (b.wind_mph - a.wind_mph),
-            gust_mph=a.gust_mph + t * (b.gust_mph - a.gust_mph),
+            gust_mph=None if a.gust_mph is None or b.gust_mph is None else a.gust_mph + t * (b.gust_mph - a.gust_mph),
             rain_in_hr=bucket.rain_in_hr,
             snow_in_hr=bucket.snow_in_hr,
             temperature_f=a.temperature_f,
@@ -125,9 +123,67 @@ def _parse_location(payload):
     )
 
 
-class OpenMeteoClient:
+class CachedWeatherClient:
+    name = ""
+    batch_size = 1
+    max_workers = 1
+
     def __init__(self, session=None):
         self.session = session or requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=self.max_workers)
+        self.session.mount("https://", adapter)
+
+    def _fetch_batch(self, points, start, end):
+        raise NotImplementedError
+
+    def hourly(self, points, start, end):
+        start, end = floor_hour(start), ceil_hour(end)
+        end = min(end, forecast_horizon())
+        snapped = {p: snap(*p) for p in points}
+        unique = sorted(set(snapped.values()))
+
+        def key(p):
+            return f"{self.name}:{p[0]}:{p[1]}:{start:%Y%m%d%H}:{end:%Y%m%d%H}"
+
+        cached = cache.get_many([key(p) for p in unique])
+        series = {p: cached[key(p)] for p in unique if key(p) in cached}
+        missing = [p for p in unique if p not in series]
+        batches = [missing[i : i + self.batch_size] for i in range(0, len(missing), self.batch_size)]
+        if batches:
+            with ThreadPoolExecutor(max_workers=min(self.max_workers, len(batches))) as pool:
+                for result in pool.map(lambda b: self._fetch_batch(b, start, end), batches):
+                    series.update(result)
+                    cache.set_many({key(p): s for p, s in result.items()}, CACHE_TTL_SECONDS)
+        logger.info("%s: %s locations, %s cached, %s requests", self.name, len(unique), len(cached), len(batches))
+        return {p: series[s] for p, s in snapped.items()}
+
+
+class FallbackWeatherClient:
+    def __init__(self, *clients):
+        self.clients = clients
+        self.source = None
+
+    def hourly(self, points, start, end):
+        error = None
+        for client in self.clients:
+            try:
+                result = client.hourly(points, start, end)
+            except UpstreamError as exc:
+                logger.warning("%s failed, trying the next weather source: %s", client.name, exc.message)
+                error = exc
+                continue
+            self.source = client.name
+            return result
+        raise error
+
+
+class OpenMeteoClient(CachedWeatherClient):
+    name = "open-meteo"
+    batch_size = 80
+    max_workers = 4
+
+    def __init__(self, session=None):
+        super().__init__(session)
         key = settings.OPEN_METEO_API_KEY
         self.base_url = (
             "https://customer-api.open-meteo.com/v1/forecast" if key else "https://api.open-meteo.com/v1/forecast"
@@ -176,28 +232,8 @@ class OpenMeteoClient:
             return {point: _parse_location(loc) for point, loc in zip(points, locations)}
         raise error
 
-    def hourly(self, points, start, end):
-        start, end = floor_hour(start), ceil_hour(end)
-        end = min(end, forecast_horizon())
-        snapped = {p: snap(*p) for p in points}
-        unique = sorted(set(snapped.values()))
-
-        def key(p):
-            return f"om:{p[0]}:{p[1]}:{start:%Y%m%d%H}:{end:%Y%m%d%H}"
-
-        cached = cache.get_many([key(p) for p in unique])
-        series = {p: cached[key(p)] for p in unique if key(p) in cached}
-        missing = [p for p in unique if p not in series]
-        batches = [missing[i : i + BATCH_SIZE] for i in range(0, len(missing), BATCH_SIZE)]
-        if batches:
-            with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(batches))) as pool:
-                for result in pool.map(lambda b: self._fetch_batch(b, start, end), batches):
-                    series.update(result)
-                    cache.set_many({key(p): s for p, s in result.items()}, CACHE_TTL_SECONDS)
-        logger.info("weather: %s locations, %s from cache, %s requests", len(unique), len(cached), len(batches))
-        return {p: series[s] for p, s in snapped.items()}
-
 
 def forecast_horizon():
     return floor_hour(datetime.now(timezone.utc)) + timedelta(days=MAX_FORECAST_DAYS, hours=-1)
+
 
