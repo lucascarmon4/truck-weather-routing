@@ -64,7 +64,17 @@ type Route = {
     miles: number[];                                             // cumulative miles per vertex
     elapsed_s: number[];                                         // seconds after departure per vertex
   };
+  stops: RestStop[];                                             // empty unless hos is on
   checkpoints: Checkpoint[];
+};
+
+type RestStop = {
+  kind: "break" | "rest";                                        // 30 min break or 10 h off duty
+  mile: number;
+  lat: number;
+  lon: number;
+  start_s: number;                                               // seconds after departure
+  end_s: number;
 };
 
 type PlanResponse = {

@@ -10,9 +10,9 @@ from . import risk
 from .alternatives import find_routes
 from .analysis import analyze, build_checkpoints
 from .errors import PlanningError
-from .geo import METERS_PER_MILE, thin_indices
+from .geo import METERS_PER_MILE, interpolate, thin_indices
 from .heatmap import HEATMAP_HOURS, build_heatmap, corridor_grid
-from .hos import elapsed_time
+from .hos import elapsed_time, rest_stops
 from .providers import RouteQuery, get_provider
 from .recommend import recommend
 from .metno import MetNorwayClient
@@ -126,6 +126,19 @@ class Planner:
             "rules": rules_payload(),
         }
 
+    @staticmethod
+    def _serialize_stop(route, stop):
+        distance_m = interpolate(route.cum_time_s, route.polyline.cum_m, stop["drive_s"])
+        lat, lon = route.polyline.point_at(distance_m)
+        return {
+            "kind": stop["kind"],
+            "mile": round(distance_m / METERS_PER_MILE, 1),
+            "lat": round(lat, 5),
+            "lon": round(lon, 5),
+            "start_s": round(stop["start_s"]),
+            "end_s": round(stop["start_s"] + stop["duration_s"]),
+        }
+
     def _serialize_route(self, analysis, label, rank):
         route, req = analysis.route, self.request
         keep = thin_indices(route.polyline.cum_m, GEOMETRY_STEP_M)
@@ -147,6 +160,7 @@ class Planner:
                 "miles": [round(route.polyline.cum_m[i] / METERS_PER_MILE, 2) for i in keep],
                 "elapsed_s": [round(elapsed_time(route.cum_time_s[i], req.hos)) for i in keep],
             },
+            "stops": [self._serialize_stop(route, stop) for stop in (rest_stops(route.duration_s) if req.hos else [])],
             "checkpoints": [
                 {
                     "index": cp.index,

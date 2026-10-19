@@ -65,3 +65,13 @@ def test_departure_in_the_past_is_rejected(client):
     response = client.post("/api/plan", payload(departure=past), format="json")
     assert response.status_code == 400
     assert "past" in response.json()["detail"]
+
+
+def test_rest_stops_are_placed_on_the_route_when_enabled(client, monkeypatch):
+    slow = straight_route(speed_mps=4, name="slow")
+    monkeypatch.setattr(planner, "get_provider", lambda: FakeProvider([slow]))
+    route = route_named(client.post("/api/plan", payload(hos=True), format="json").json(), "slow")
+    assert [s["kind"] for s in route["stops"]] == ["break", "rest"]
+    assert route["stops"][0]["start_s"] == 8 * 3600
+    assert route["stops"][1]["mile"] == pytest.approx(11 * 3600 * 4 / 1609.344, abs=0.2)
+    assert route["trip_s"] == route["drive_s"] + 30 * 60 + 10 * 3600
