@@ -40,6 +40,7 @@ export type RouteMapProps = {
   heatmapVisible: boolean
   heatmapOpacity: number
   activeCheckpoint: number | null
+  popupCheckpoint: number | null
   onHoverCheckpoint: (index: number | null) => void
   onPickCheckpoint: (index: number) => void
   renderCheckpoint: (checkpoint: Checkpoint, route: Route) => ReactNode
@@ -57,6 +58,7 @@ export function RouteMap({
   heatmapVisible,
   heatmapOpacity,
   activeCheckpoint,
+  popupCheckpoint,
   onHoverCheckpoint,
   onPickCheckpoint,
   renderCheckpoint,
@@ -109,7 +111,7 @@ export function RouteMap({
     onHoverCheckpoint(feature?.layer.id === 'checkpoints' ? (feature.properties.index as number) : null)
   }
 
-  const active = selected && activeCheckpoint !== null ? selected.checkpoints[activeCheckpoint] : null
+  const active = selected && popupCheckpoint !== null ? selected.checkpoints[popupCheckpoint] : null
   const destination = plan ? shortPlace(plan.request.destination.label).split(',')[0] : ''
 
   return (

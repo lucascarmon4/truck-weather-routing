@@ -157,6 +157,7 @@ export default function App() {
           heatmapVisible={heatmapOn}
           heatmapOpacity={opacity}
           activeCheckpoint={desktop ? activeCheckpoint : hovered}
+          popupCheckpoint={hovered}
           onHoverCheckpoint={setHovered}
           onPickCheckpoint={pickCheckpoint}
           renderCheckpoint={(cp) => <CheckpointTooltip checkpoint={cp} />}
